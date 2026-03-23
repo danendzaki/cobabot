@@ -1,6 +1,7 @@
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, CallbackQueryHandler, filters, ContextTypes
 from datetime import datetime
+import calendar
 from db_cobabot import conn, cursor, init_db
 
 init_db()
@@ -29,7 +30,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if state == "nama":
         context.user_data["nama"] = text
-        context.user_data["state"] = "tahun"
         await pilih_tahun(update)
 
     elif text == "➕ Tambah Tugas":
@@ -43,41 +43,52 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================= PILIH TAHUN =================
 async def pilih_tahun(update):
-    tahun_sekarang = datetime.now().year
+    tahun = datetime.now().year
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(str(tahun_sekarang), callback_data=f"tahun_{tahun_sekarang}")],
-        [InlineKeyboardButton(str(tahun_sekarang+1), callback_data=f"tahun_{tahun_sekarang+1}")]
+        [InlineKeyboardButton(str(tahun), callback_data=f"tahun_{tahun}")],
+        [InlineKeyboardButton(str(tahun+1), callback_data=f"tahun_{tahun+1}")]
     ])
 
     await update.message.reply_text("📅 Pilih Tahun:", reply_markup=keyboard)
 
 # ================= PILIH BULAN =================
 async def pilih_bulan(query):
+    bulan = [
+        ("Jan", "01"), ("Feb", "02"), ("Mar", "03"),
+        ("Apr", "04"), ("Mei", "05"), ("Jun", "06"),
+        ("Jul", "07"), ("Agu", "08"), ("Sep", "09"),
+        ("Okt", "10"), ("Nov", "11"), ("Des", "12")
+    ]
+
     keyboard = []
-    for i in range(1, 13, 3):
+    for i in range(0, 12, 3):
         keyboard.append([
-            InlineKeyboardButton(str(i), callback_data=f"bulan_{i}"),
-            InlineKeyboardButton(str(i+1), callback_data=f"bulan_{i+1}"),
-            InlineKeyboardButton(str(i+2), callback_data=f"bulan_{i+2}")
+            InlineKeyboardButton(bulan[i][0], callback_data=f"bulan_{bulan[i][1]}"),
+            InlineKeyboardButton(bulan[i+1][0], callback_data=f"bulan_{bulan[i+1][1]}"),
+            InlineKeyboardButton(bulan[i+2][0], callback_data=f"bulan_{bulan[i+2][1]}")
         ])
 
     await query.edit_message_text("📆 Pilih Bulan:", reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ================= PILIH TANGGAL =================
-async def pilih_tanggal(query):
+async def pilih_tanggal(query, context):
     keyboard = []
-    for i in range(1, 32, 4):
-        keyboard.append([
-            InlineKeyboardButton(str(i), callback_data=f"tgl_{i}"),
-            InlineKeyboardButton(str(i+1), callback_data=f"tgl_{i+1}"),
-            InlineKeyboardButton(str(i+2), callback_data=f"tgl_{i+2}"),
-            InlineKeyboardButton(str(i+3), callback_data=f"tgl_{i+3}")
-        ])
+    row = []
+
+    for i in range(1, 33):
+        row.append(InlineKeyboardButton(str(i), callback_data=f"tgl_{i}"))
+
+        if len(row) == 4:
+            keyboard.append(row)
+            row = []
+
+    if row:
+        keyboard.append(row)
 
     await query.edit_message_text("📅 Pilih Tanggal:", reply_markup=InlineKeyboardMarkup(keyboard))
 
-# ================= TAMPILKAN =================
+# ================= TAMPILKAN (ANTI CRASH) =================
 async def tampilkan_tugas(update_or_query, context):
     user_id = update_or_query.effective_user.id
 
@@ -91,21 +102,28 @@ async def tampilkan_tugas(update_or_query, context):
     teks = "📋 Daftar Tugas:\n\n"
     keyboard = []
 
-    today = datetime.now().date()
-
     for d in data:
-        deadline = datetime.strptime(d[3], "%Y-%m-%d").date()
+        try:
+            deadline = datetime.strptime(d[3], "%Y-%m-%d").date()
+            today = datetime.now().date()
 
-        if d[5] == "selesai":
-            status = "✅"
-        elif deadline < today:
-            status = "❗ Terlambat"
-        elif deadline == today:
-            status = "🔥 Hari ini"
-        else:
-            status = "⏳"
+            if d[5] == "selesai":
+                status = "✅"
+            elif deadline < today:
+                status = "❗ Terlambat"
+            elif deadline == today:
+                status = "🔥 Hari ini"
+            else:
+                status = "⏳"
 
-        teks += f"{status} {d[2]}\n📅 {d[3]} | 🔥 {d[4]}\n\n"
+            deadline_text = d[3]
+
+        except:
+            # 💥 DATA RUSAK
+            status = "⚠️ ERROR"
+            deadline_text = f"{d[3]} (invalid)"
+
+        teks += f"{status} {d[2]}\n📅 {deadline_text} | 🔥 {d[4]}\n\n"
 
         keyboard.append([
             InlineKeyboardButton("✅", callback_data=f"selesai_{d[0]}"),
@@ -123,35 +141,37 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data
 
-    # TAHUN
     if data.startswith("tahun_"):
         context.user_data["tahun"] = data.split("_")[1]
         await pilih_bulan(query)
 
-    # BULAN
     elif data.startswith("bulan_"):
         context.user_data["bulan"] = data.split("_")[1]
-        await pilih_tanggal(query)
+        await pilih_tanggal(query, context)
 
-    # TANGGAL
     elif data.startswith("tgl_"):
-        tahun = context.user_data["tahun"]
-        bulan = context.user_data["bulan"]
-        tanggal = data.split("_")[1]
+        tahun = int(context.user_data["tahun"])
+        bulan = int(context.user_data["bulan"])
+        tanggal = int(data.split("_")[1])
 
-        deadline = f"{tahun}-{int(bulan):02d}-{int(tanggal):02d}"
+        jumlah_hari = calendar.monthrange(tahun, bulan)[1]
+
+        if tanggal > jumlah_hari:
+            await query.answer("❌ Tanggal tidak valid!", show_alert=True)
+            await pilih_tanggal(query, context)
+            return
+
+        deadline = f"{tahun}-{bulan:02d}-{tanggal:02d}"
+        context.user_data["deadline"] = deadline
 
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔥 High", callback_data=f"prio_High")],
-            [InlineKeyboardButton("⚡ Medium", callback_data=f"prio_Medium")],
-            [InlineKeyboardButton("💤 Low", callback_data=f"prio_Low")]
+            [InlineKeyboardButton("🔥 High", callback_data="prio_High")],
+            [InlineKeyboardButton("⚡ Medium", callback_data="prio_Medium")],
+            [InlineKeyboardButton("💤 Low", callback_data="prio_Low")]
         ])
-
-        context.user_data["deadline"] = deadline
 
         await query.edit_message_text(f"📅 Deadline: {deadline}\nPilih prioritas:", reply_markup=keyboard)
 
-    # PRIORITAS
     elif data.startswith("prio_"):
         prioritas = data.split("_")[1]
         user_id = update.effective_user.id
@@ -167,14 +187,12 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("✅ Tugas berhasil ditambahkan!")
         await context.bot.send_message(chat_id=user_id, text="Kembali ke menu:", reply_markup=menu())
 
-    # SELESAI
     elif data.startswith("selesai_"):
         id_tugas = int(data.split("_")[1])
         cursor.execute("UPDATE tugas SET status='selesai' WHERE id=?", (id_tugas,))
         conn.commit()
         await tampilkan_tugas(query, context)
 
-    # HAPUS
     elif data.startswith("hapus_"):
         id_tugas = int(data.split("_")[1])
         cursor.execute("DELETE FROM tugas WHERE id=?", (id_tugas,))
