@@ -39,8 +39,7 @@ Fitur:
 .
 ├── cobabot.py        # To-Do Bot (main)
 ├── db_cobabot.py     # Database To-Do Bot
-├── umkm_bot.py       # UMKM Bot (main)
-├── db_umkm.py        # Database UMKM Bot
+├── uji_coba1.py      # UMKM Bot (main)
+├── db_ujicoba1.py    # Database UMKM Bot
 ├── todo.db           # Database To-Do
-└── umkm.db           # Database UMKM
 ```
