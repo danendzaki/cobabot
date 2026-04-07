@@ -1,4 +1,4 @@
-# Telegram Bot Collection
+# Telegram Bot Collection Danendra Dzaki Andita
 
 Repository ini berisi beberapa bot Telegram berbasis Python yang dibuat untuk kebutuhan pembelajaran dan implementasi sederhana, seperti manajemen tugas dan simulasi sistem UMKM.
 
@@ -35,10 +35,11 @@ Fitur:
 
 ## 🧱 Struktur Project
 
-├── cobabot.py # To-Do Bot (main)
-├── db_cobabot.py # Database To-Do Bot
-├── umkm_bot.py # UMKM Bot (main)
-├── db_umkm.py # Database UMKM Bot
-├── todo.db # Database To-Do
-└── umkm.db # Database UMKM
-
+```bash
+.
+├── cobabot.py        # To-Do Bot (main)
+├── db_cobabot.py     # Database To-Do Bot
+├── uji_coba1.py      # UMKM Bot (main)
+├── db_ujicoba1.py    # Database UMKM Bot
+├── todo.db           # Database To-Do
+```
